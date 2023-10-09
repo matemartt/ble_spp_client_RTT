@@ -1,0 +1,11 @@
+{
+    "idf.flashType": "UART",
+    "idf.port": "/dev/ttyACM0",
+    "idf.adapterTargetName": "esp32c3",
+    "files.associations": {
+        "esp_bt_device.h": "c",
+        "esp_gap_ble_api.h": "c",
+        "esp_gattc_api.h": "c",
+        "stdbool.h": "c"
+    }
+}
