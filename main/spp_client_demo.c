@@ -31,6 +31,7 @@
 #define ESP_GATT_SPP_SERVICE_UUID         0xABF0                                              // UUID
 #define SCAN_ALL_THE_TIME                 0                                                   // Scan constante
 #define INITIAL_SCAN_EVT_NUM_ESTIMATE     100                                                 // Tamaño inicial estimado del número de eventos de SCAN
+#define BLE_MAC_ADDR_LEN                  14                                                  // Longitud de la dirección MAC
 
 // Instancia del perfil GATT
 struct gattc_profile_inst {
@@ -261,6 +262,18 @@ void freeVector(SCAN_EVT_VEC_t* vec) {
     vec->capacity = 0;
 }
 
+void gatt_client_update_connection_params(uint8_t channel, uint8_t* remote_bda, __int16_t min_int, __int16_t max_int, __int16_t latency, __int16_t timeout)
+{
+    esp_ble_conn_update_params_t conn_params;
+    memcpy(conn_params.bda, remote_bda, BLE_MAC_ADDR_LEN);
+    conn_params.min_int = min_int; //   [0x06, 0x0C80]   default 0x06   x 1.25ms
+    conn_params.max_int = max_int; //   [0x06, 0x0C80]   default 0x20   x 1.25ms
+    conn_params.latency = latency; //   [   0,    499]   default 0x00   number of skippable connection events
+    conn_params.timeout = timeout; // [0x000A, 0x0C80]   default 0xA0   x 6.25ms, time before peripheral will assume connection is dropped.
+    
+    esp_ble_gap_update_conn_params(&conn_params);
+}
+
 __int32_t sr = 1;
 
 SCAN_EVT_VEC_t maxint;
@@ -280,7 +293,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
     case ESP_GAP_BLE_SCAN_PARAM_SET_COMPLETE_EVT: {
 
         printf("PARAM SET COMPLETE\n\nMIN_IN           %lld\nMAX_IN           %lld\nLAT              %lld\nCONN_IN          %lld\nTOUT             %lld\n\n", (__int64_t)param->update_conn_params.min_int, (__int64_t)param->update_conn_params.max_int, (__int64_t)param->update_conn_params.latency, (__int64_t)param->update_conn_params.conn_int, (__int64_t)param->update_conn_params.timeout);
-        usleep(3000000);
+        //usleep(3000000);
 
         if((err = param->scan_param_cmpl.status) != ESP_BT_STATUS_SUCCESS){
             ESP_LOGE(GATTC_TAG, "Scan param set failed: %s", esp_err_to_name(err));
@@ -300,7 +313,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
         }
 
         printf("SCAN START COMPLETE\n\nMIN_IN           %lld\nMAX_IN           %lld\nLAT              %lld\nCONN_IN          %lld\nTOUT             %lld\n\n", (__int64_t)param->update_conn_params.min_int, (__int64_t)param->update_conn_params.max_int, (__int64_t)param->update_conn_params.latency, (__int64_t)param->update_conn_params.conn_int, (__int64_t)param->update_conn_params.timeout);
-        usleep(3000000);
+        //usleep(3000000);
 
         ESP_LOGI(GATTC_TAG, "Scan start successed");
         break;
@@ -314,7 +327,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
             ESP_LOGI(GATTC_TAG, "Connect to the remote device.");
 
             printf("SCAN STOP COMPLETE\n\nMIN_IN           %lld\nMAX_IN           %lld\nLAT              %lld\nCONN_IN          %lld\nTOUT             %lld\n\n", (__int64_t)param->update_conn_params.min_int, (__int64_t)param->update_conn_params.max_int, (__int64_t)param->update_conn_params.latency, (__int64_t)param->update_conn_params.conn_int, (__int64_t)param->update_conn_params.timeout);
-            usleep(4000000);
+            //usleep(3000000);
             
             esp_ble_gattc_open(gl_profile_tab[PROFILE_APP_ID].gattc_if, scan_rst.scan_rst.bda, scan_rst.scan_rst.ble_addr_type, true);
         }
@@ -416,9 +429,26 @@ void my_task(void *pvParameters){
 
     int n_elements = n_min + payload;
     data.size = n_elements * sizeof(__int64_t);
+    __int8_t counter = 0; 
     
     for (;;) {
 
+        if (counter == 14){ // Nenvío = counter - 14; Nenvío 0 -> counter = 14.
+            gatt_client_update_connection_params(1, gl_profile_tab[PROFILE_APP_ID].remote_bda, 0x0006, 0x0008, 0x0000, 0x000A);
+        }
+
+        if (counter == 34){ // Nenvío = counter - 14; Nenvío 20 -> counter = 34.
+            gatt_client_update_connection_params(1, gl_profile_tab[PROFILE_APP_ID].remote_bda, 0x0006, 0x0006, 0x0000, 0x000A);
+        }
+
+        if (counter == 54){ // Nenvío = counter - 14; Nenvío 40 -> counter = 54.
+            gatt_client_update_connection_params(1, gl_profile_tab[PROFILE_APP_ID].remote_bda, 0x0020, 0x0020, 0x0000, 0x000A);
+        }
+
+        if (counter == 74){ // Nenvío = counter - 14; Nenvío 60 -> counter = 74.
+            gatt_client_update_connection_params(1, gl_profile_tab[PROFILE_APP_ID].remote_bda, 0x0024, 0x0024, 0x0000, 0x000A);
+        }
+        
         uint32_t inicio = millis();
 
         if ((data.size)&&(is_connect)) {
@@ -446,6 +476,7 @@ void my_task(void *pvParameters){
             
         }
 
+        //
         uint32_t retardo = millis() - inicio;
 
         if (retardo < delay){
@@ -457,8 +488,10 @@ void my_task(void *pvParameters){
         }
 
         //vTaskDelay(delay / portTICK_PERIOD_MS);
+
+        counter++;
     }
-    vTaskDelete(NULL);
+    vTaskDelete(NULL); 
 }
 
 // Inicializar tarea
@@ -570,7 +603,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         }
         printf("\n");
 
-        printf("%ld\n", sr - 1);
+        printf("%ld\n\n", sr - 1);
         //printf("%d, %d, %d, %d, %d \n", minint.size, maxint.size, connint.size, latenci.size, timeaut.size);
 
         if(p_data->write.status != ESP_GATT_OK){
