@@ -163,11 +163,11 @@ void msg_log (esp_ble_gattc_cb_param_t * p_data, int64_t CURRENT_TIME) {
     int8_t n_payload = PACK_SIZE / 8;
 
     printf("RX ");
-    format_time(SENT_TSTMP);
-    format_time(CURRENT_TIME);
+    //format_time(SENT_TSTMP);
     printf("%lld ", PACK_N);
+    format_time(CURRENT_TIME);
     time_delay(SENT_TSTMP, CURRENT_TIME);
-    printf("%lld ", PACK_SIZE);
+    printf("%lld Bytes", PACK_SIZE);
 
     __int64_t *PAYLOAD = (__int64_t*)malloc(sizeof(__int64_t) * (n_payload-n_min));
     for(int i = 0; i < n_payload - n_min ; i++){ 
@@ -419,7 +419,7 @@ typedef struct{
 
 // Valores del mensaje
 int16_t payload = 0;
-int32_t delay = 400;
+int32_t delay = 300;
 int16_t n_paquete = 1;
 
 // my_Task
@@ -429,26 +429,14 @@ void my_task(void *pvParameters){
 
     int n_elements = n_min + payload;
     data.size = n_elements * sizeof(__int64_t);
-    __int8_t counter = 0; 
-    
+    __int16_t counter = 0; 
+
     for (;;) {
 
-        if (counter == 14){ // Nenvío = counter - 14; Nenvío 0 -> counter = 14.
-            gatt_client_update_connection_params(1, gl_profile_tab[PROFILE_APP_ID].remote_bda, 0x0006, 0x0008, 0x0000, 0x000A);
-        }
-
-        if (counter == 34){ // Nenvío = counter - 14; Nenvío 20 -> counter = 34.
+        if (counter == 20){
             gatt_client_update_connection_params(1, gl_profile_tab[PROFILE_APP_ID].remote_bda, 0x0006, 0x0006, 0x0000, 0x000A);
         }
 
-        if (counter == 54){ // Nenvío = counter - 14; Nenvío 40 -> counter = 54.
-            gatt_client_update_connection_params(1, gl_profile_tab[PROFILE_APP_ID].remote_bda, 0x0020, 0x0020, 0x0000, 0x000A);
-        }
-
-        if (counter == 74){ // Nenvío = counter - 14; Nenvío 60 -> counter = 74.
-            gatt_client_update_connection_params(1, gl_profile_tab[PROFILE_APP_ID].remote_bda, 0x0024, 0x0024, 0x0000, 0x000A);
-        }
-        
         uint32_t inicio = millis();
 
         if ((data.size)&&(is_connect)) {
@@ -467,8 +455,8 @@ void my_task(void *pvParameters){
 
             if(esp_ble_gattc_write_char(spp_gattc_if, spp_conn_id, spp_srv_start_handle + 2, data.size, (uint8_t*)data.data, ESP_GATT_WRITE_TYPE_RSP, ESP_GATT_AUTH_REQ_NONE) == ESP_OK){
                 printf("TX ");
-                format_time(data.data[0]);
-                printf("%lld\n", data.data[1]);
+                printf("%lld ", data.data[1]);
+                format_time(data.data[0]); //printf("32 32"); printf("\n");
             }
 
             n_paquete++;
@@ -494,7 +482,7 @@ void my_task(void *pvParameters){
     vTaskDelete(NULL); 
 }
 
-// Inicializar tarea
+// Inicializar tareacounter
 static void my_task_init(void)
 {
     xTaskCreate(my_task, "my_task", 2048, NULL, 8, NULL);
@@ -552,6 +540,16 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
 
         break;
     }
+    case ESP_GATTC_WRITE_CHAR_EVT:
+        //printf("Salida "); format_time(get_time());
+
+        //ESP_LOGI(GATTC_TAG,"ESP_GATTC_WRITE_CHAR_EVT:status = %d,handle = %d", param->write.status, param->write.handle);
+        if(param->write.status != ESP_GATT_OK){
+            //ESP_LOGE(GATTC_TAG, "ESP_GATTC_WRITE_CHAR_EVT, error status = %d", p_data->write.status);
+            break;
+        }
+
+        break;
     case ESP_GATTC_NOTIFY_EVT:
         //ESP_LOGI(GATTC_TAG,"ESP_GATTC_NOTIFY_EVT\n");
         notify_event_handler(p_data);
@@ -559,16 +557,11 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
     case ESP_GATTC_READ_CHAR_EVT:
         ESP_LOGI(GATTC_TAG,"ESP_GATTC_READ_CHAR_EVT\n");
         break;
-    case ESP_GATTC_WRITE_CHAR_EVT:
-        //ESP_LOGI(GATTC_TAG,"ESP_GATTC_WRITE_CHAR_EVT:status = %d,handle = %d", param->write.status, param->write.handle);
-        if(param->write.status != ESP_GATT_OK){
-            //ESP_LOGE(GATTC_TAG, "ESP_GATTC_WRITE_CHAR_EVT, error status = %d", p_data->write.status);
-            break;
-        }
-        break;
     case ESP_GATTC_PREP_WRITE_EVT:
+        printf("Prep "); format_time(get_time());
         break;
     case ESP_GATTC_EXEC_EVT:
+        printf("Exec "); format_time(get_time());
         break;
     case ESP_GATTC_WRITE_DESCR_EVT:
         ESP_LOGI(GATTC_TAG,"ESP_GATTC_WRITE_DESCR_EVT: status =%d,handle = %d \n", p_data->write.status, p_data->write.handle);
@@ -601,9 +594,9 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         for (int i = 0; i < sr - 1; i++) {
         printf("%d ", timeaut.data[i]);
         }
-        printf("\n");
+        printf("\n\n");
 
-        printf("%ld\n\n", sr - 1);
+        printf("Número de eventos: %ld\n\n", sr - 1);
         //printf("%d, %d, %d, %d, %d \n", minint.size, maxint.size, connint.size, latenci.size, timeaut.size);
 
         if(p_data->write.status != ESP_GATT_OK){
@@ -624,8 +617,8 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         if(p_data->cfg_mtu.status != ESP_OK){
             break;
         }
-        ESP_LOGI(GATTC_TAG,"+MTU:%d\n", p_data->cfg_mtu.mtu);
-        spp_mtu_size = p_data->cfg_mtu.mtu;
+        ESP_LOGI(GATTC_TAG,"+MTU: 1000");     // %d\n", p_data->cfg_mtu.mtu);
+        spp_mtu_size = 1000;                  // p_data->cfg_mtu.mtu; 
 
         db = (esp_gattc_db_elem_t *)malloc(count*sizeof(esp_gattc_db_elem_t));
         if(db == NULL){
@@ -718,10 +711,10 @@ void ble_client_appRegister(void)
     }
     esp_ble_gattc_app_register(PROFILE_APP_ID);
 
-    // esp_err_t local_mtu_ret = esp_ble_gatt_set_local_mtu(23000);
-    // if (local_mtu_ret){
-    //     ESP_LOGE(GATTC_TAG, "set local  MTU failed: %s", esp_err_to_name_r(local_mtu_ret, err_msg, sizeof(err_msg)));
-    // }
+    esp_err_t local_mtu_ret = esp_ble_gatt_set_local_mtu(23000);
+    if (local_mtu_ret){
+        ESP_LOGE(GATTC_TAG, "set local  MTU failed: %s", esp_err_to_name_r(local_mtu_ret, err_msg, sizeof(err_msg)));
+    }
 
     cmd_reg_queue = xQueueCreate(10, sizeof(uint32_t));
     xTaskCreate(spp_client_reg_task, "spp_client_reg_task", 2048, NULL, 10, NULL);
@@ -730,6 +723,7 @@ void ble_client_appRegister(void)
 void app_main(void)
 {
     set_time();
+    //__int64_t inicio = get_time();
 
     esp_err_t ret;
 
@@ -763,5 +757,7 @@ void app_main(void)
     }
 
     ble_client_appRegister();
+    //__int64_t fin = get_time();
+    //usleep(10000000-fin+inicio);
     my_task_init();
 }
